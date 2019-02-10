@@ -8,6 +8,8 @@ extern PaStreamCallback* paStreamCallback;
 */
 import "C"
 
+//Replace Path to your Path to the PortAudio include dir and Libs
+
 import (
 	"fmt"
 	"reflect"
