@@ -42,9 +42,10 @@ func VersionText() string {
 func Initialize() error {
 	err := C.Pa_Initialize()
 	if err != C.paNoError {
-		fmt.Printf("PortAudio error: %s\n", C.Pa_GetErrorText(err))
+		return Error(err)
 	}
-	return Error(err)
+	return nil
+
 }
 
 func ListDevices() error {
@@ -84,7 +85,38 @@ func OpenDefaultStream(numIn, numOut int, sf SampleFormat, sampleRate float64, f
 		fmt.Printf("PortAudio error: %s\n", C.Pa_GetErrorText(err))
 		return nil, Error(err)
 	}
-	return s, Error(err)
+	return s, nil
+}
+
+func OpenStream(in, out *PaStreamParameters, sf SampleFormat, sampleRate uint64, framesPerBuffer uint64) (*Stream, error) {
+	s := &Stream{}
+	pa_in := &C.PaStreamParameters{}
+	if in != nil {
+		pa_in.channelCount = C.int(in.ChannelCount)
+		pa_in.device = C.int(in.DeviceNum)
+		pa_in.sampleFormat = C.ulong(in.Sampleformat)
+		pa_in.suggestedLatency = C.Pa_GetDeviceInfo(pa_in.device).defaultLowInputLatency
+		pa_in.hostApiSpecificStreamInfo = nil
+	} else {
+		pa_in = nil
+	}
+
+	pa_out := &C.PaStreamParameters{}
+	if out != nil {
+		pa_out.channelCount = C.int(out.ChannelCount)
+		pa_out.device = C.int(out.DeviceNum)
+		pa_out.sampleFormat = C.ulong(out.Sampleformat)
+		pa_out.suggestedLatency = C.Pa_GetDeviceInfo(pa_out.device).defaultLowInputLatency
+		pa_out.hostApiSpecificStreamInfo = nil
+	} else {
+		pa_out = nil
+	}
+	err := C.Pa_OpenStream(&s.stream, pa_in, pa_out, C.double(sampleRate), C.ulong(framesPerBuffer), C.paClipOff, C.paStreamCallback, nil)
+	if err != C.paNoError {
+		fmt.Printf("PortAudio error: %s\n", C.Pa_GetErrorText(err))
+		return nil, Error(err)
+	}
+	return s, nil
 }
 
 type Stream struct {
@@ -117,17 +149,59 @@ func (s *Stream) Stop() error {
 }
 
 type IStream interface {
-	Cbb(inputBuffer, outputBuffer unsafe.Pointer, frames uint64)
+	CallBack(inputBuffer, outputBuffer unsafe.Pointer, frames uint64)
 }
 
-var Cba [1]IStream
+var CbStream IStream
 
 //export streamCallback
 func streamCallback(inputBuffer, outputBuffer unsafe.Pointer, frames C.ulong, timeInfo *C.PaStreamCallbackTimeInfo, statusFlags C.PaStreamCallbackFlags, userData unsafe.Pointer) {
-	s := Cba[0]
-	s.Cbb(inputBuffer, outputBuffer, uint64(frames))
+	CbStream.CallBack(inputBuffer, outputBuffer, uint64(frames))
 }
 
 func printType(args ...interface{}) {
 	fmt.Println(reflect.TypeOf(args[0]))
+}
+
+type PaStreamParameters struct {
+	DeviceNum    int
+	ChannelCount int
+	Sampleformat SampleFormat
+}
+
+func (p *PaStreamParameters) String() string {
+	return fmt.Sprintf("device num %d, channel count %d, sampleformat %d ", p.DeviceNum, p.ChannelCount, p.Sampleformat)
+}
+
+func IsformatSupported(in, out *PaStreamParameters, desiredSampleRate uint64) error {
+	pa_in := &C.PaStreamParameters{}
+	if in != nil {
+		pa_in.channelCount = C.int(in.ChannelCount)
+		pa_in.device = C.int(in.DeviceNum)
+		pa_in.sampleFormat = C.ulong(in.Sampleformat)
+		pa_in.suggestedLatency = C.Pa_GetDeviceInfo(pa_in.device).defaultLowInputLatency
+		pa_in.hostApiSpecificStreamInfo = nil
+	} else {
+		pa_in = nil
+	}
+
+	pa_out := &C.PaStreamParameters{}
+	if out != nil {
+		pa_out.channelCount = C.int(out.ChannelCount)
+		pa_out.device = C.int(out.DeviceNum)
+		pa_out.sampleFormat = C.ulong(out.Sampleformat)
+		pa_out.suggestedLatency = C.Pa_GetDeviceInfo(pa_out.device).defaultLowInputLatency
+		pa_out.hostApiSpecificStreamInfo = nil
+	} else {
+		pa_out = nil
+	}
+
+	err := C.Pa_IsFormatSupported(pa_in, pa_out, C.double(desiredSampleRate))
+
+	if err != C.paFormatIsSupported {
+		return Error(err)
+	}
+
+	return nil
+
 }
