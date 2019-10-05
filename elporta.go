@@ -2,8 +2,8 @@ package pa
 
 /*
 #include <portaudio.h>
-#cgo CFLAGS: -I/Users/elerer/portaudio/include
-#cgo LDFLAGS: -framework CoreAudio -framework AudioToolbox -framework AudioUnit -framework CoreServices -framework Carbon -lstdc++ -L/Users/elerer/portaudio/lib/.libs/static -lportaudio
+#cgo CFLAGS: -I/home/eranl/portaudio/include
+#cgo LDFLAGS: -lstdc++ -L/home/eranl/portaudio/lib/.libs -lportaudio
 extern PaStreamCallback* paStreamCallback;
 */
 import "C"
@@ -59,12 +59,13 @@ func ListDevices() error {
 
 	for i := 0; i < int(numDevices); i++ {
 		//x := C.PaDeviceIndex(i)
-		dis[i] = C.Pa_GetDeviceInfo(C.int(i))
+		dis[i] = C.Pa_GetDeviceInfo(C.PaDeviceIndex(i))
 	}
 
 	for n, di := range dis {
 		nm := C.GoString(di.name)
-		fmt.Printf("device [%d]: name [%s], inputs [%d], outputs [%d], default sample rate [%f]\n", n, nm, di.maxInputChannels, di.maxOutputChannels, di.defaultSampleRate)
+		fmt.Printf("device [%d]: name [%s], inputs [%d], outputs [%d], default sample rate [%f], lowest latency [%f], highest latency [%f]\n",
+			n, nm, di.maxInputChannels, di.maxOutputChannels, di.defaultSampleRate, di.defaultLowInputLatency, di.defaultHighInputLatency)
 	}
 	return nil
 }
@@ -93,9 +94,9 @@ func OpenStream(in, out *PaStreamParameters, sf SampleFormat, sampleRate uint64,
 	pa_in := &C.PaStreamParameters{}
 	if in != nil {
 		pa_in.channelCount = C.int(in.ChannelCount)
-		pa_in.device = C.int(in.DeviceNum)
-		pa_in.sampleFormat = C.ulong(in.Sampleformat)
-		pa_in.suggestedLatency = C.Pa_GetDeviceInfo(pa_in.device).defaultLowInputLatency
+		pa_in.device = C.PaDeviceIndex(in.DeviceNum)
+		pa_in.sampleFormat = C.PaSampleFormat(in.Sampleformat)
+		pa_in.suggestedLatency = C.Pa_GetDeviceInfo(pa_in.device).defaultHighInputLatency
 		pa_in.hostApiSpecificStreamInfo = nil
 	} else {
 		pa_in = nil
@@ -104,8 +105,8 @@ func OpenStream(in, out *PaStreamParameters, sf SampleFormat, sampleRate uint64,
 	pa_out := &C.PaStreamParameters{}
 	if out != nil {
 		pa_out.channelCount = C.int(out.ChannelCount)
-		pa_out.device = C.int(out.DeviceNum)
-		pa_out.sampleFormat = C.ulong(out.Sampleformat)
+		pa_out.device = C.PaDeviceIndex(out.DeviceNum)
+		pa_out.sampleFormat = C.PaSampleFormat(out.Sampleformat)
 		pa_out.suggestedLatency = C.Pa_GetDeviceInfo(pa_out.device).defaultLowInputLatency
 		pa_out.hostApiSpecificStreamInfo = nil
 	} else {
@@ -177,8 +178,8 @@ func IsformatSupported(in, out *PaStreamParameters, desiredSampleRate uint64) er
 	pa_in := &C.PaStreamParameters{}
 	if in != nil {
 		pa_in.channelCount = C.int(in.ChannelCount)
-		pa_in.device = C.int(in.DeviceNum)
-		pa_in.sampleFormat = C.ulong(in.Sampleformat)
+		pa_in.device = C.PaDeviceIndex(in.DeviceNum)
+		pa_in.sampleFormat = C.PaSampleFormat(in.Sampleformat)
 		pa_in.suggestedLatency = C.Pa_GetDeviceInfo(pa_in.device).defaultLowInputLatency
 		pa_in.hostApiSpecificStreamInfo = nil
 	} else {
@@ -188,8 +189,8 @@ func IsformatSupported(in, out *PaStreamParameters, desiredSampleRate uint64) er
 	pa_out := &C.PaStreamParameters{}
 	if out != nil {
 		pa_out.channelCount = C.int(out.ChannelCount)
-		pa_out.device = C.int(out.DeviceNum)
-		pa_out.sampleFormat = C.ulong(out.Sampleformat)
+		pa_out.device = C.PaDeviceIndex(out.DeviceNum)
+		pa_out.sampleFormat = C.PaSampleFormat(out.Sampleformat)
 		pa_out.suggestedLatency = C.Pa_GetDeviceInfo(pa_out.device).defaultLowInputLatency
 		pa_out.hostApiSpecificStreamInfo = nil
 	} else {
